@@ -1,0 +1,69 @@
+!pip install yfinance
+!pip install --upgrade yfinance
+import yfinance as yf
+
+!pip install --upgrade pandas
+
+from google.colab import drive
+drive.mount('/content/gdrive')
+
+import pandas as pd
+
+from datetime import datetime, date, timedelta
+from functools import reduce
+today = datetime.today().strftime('%Y-%m-%d')
+ticker=input().upper()
+stock = yf.Ticker(ticker)
+stock_earnings_hist = stock.get_earnings_dates(limit=15)
+frame=pd.DataFrame.from_dict(stock_earnings_hist)
+frame['Date'] = frame.index.date
+
+frame['date'] = pd.to_datetime(frame['Date'])
+frame.set_index("Date", inplace = True)
+frame['ticker'] = ticker
+frame=frame.dropna()
+
+start=datetime.now()+timedelta(days=-900)
+end=datetime.now()
+
+p = yf.download(ticker, start, end)
+
+p['Close 1d']=p['Adj Close'].pct_change()
+p['date'] = p.index
+p['date']=p['date'].dt.strftime('%Y-%m-%d')
+p['date'].astype(str).astype(str)
+t2 = p['date'].astype(str).str.zfill(6)
+p['date'] = pd.to_datetime(t2, format='%Y-%m-%d')
+
+p.date.astype('datetime64[ns]')
+frame.date.astype('datetime64[ns]')
+result = p.merge(frame, on=['date'], how='outer')
+
+result['Max']= 0
+result['Min']= 0
+result['Earning']=''
+
+Max = result['Close 1d'].iloc[1]
+Min = result['Close 1d'].iloc[1]
+for i in range(len(result)):
+if Max < result['Close 1d'].iloc[(i)]:
+result['Max'].iloc[(i)] = result['Close 1d'].iloc[(i)]
+Max = result['Close 1d'].iloc[(i)]
+else:
+result['Max'].iloc[(i)] = Max
+
+if Min > result['Close 1d'].iloc[(i)]:
+    result['Min'].iloc[(i)] = result['Close 1d'].iloc[(i)]
+    Min = result['Close 1d'].iloc[(i)]
+else:
+    result['Min'].iloc[(i)] = Min
+if result['ticker'].iloc[(i)] == ticker:
+    result['Earning'].iloc[(i+1)] = 'Earning impact '+ str("{:.2%}".format(result['Close 1d'].iloc[(i+1)]))
+    
+
+result.to_excel(today+"_"+ticker+"_AMC_Analytics.xlsx")
+
+!cp *.xlsx "/content/gdrive/MyDrive/Earnings/"
+
+print(ticker, 'Max is: ', Max)
+print(ticker, 'Min is: ', Min)
